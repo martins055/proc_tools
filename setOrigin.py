@@ -38,6 +38,7 @@ def setOrigin(acq,markerOrigin):
         except: print("Cannot find the markerOrigin {}".format(args.markerOrigin))
 
         # Loop through all the markers and substract the values of the origin marker
+
         for pointNumber in range(0, acq.GetPointNumber()):
             x = pointNumber
 
@@ -72,7 +73,7 @@ if __name__ == '__main__':
     parser.add_argument ('--output',       '-o',  metavar = 'output',       type = str, help = 'The output file to write (.c3d or .trc)',           required=True)
     args = parser.parse_args()
     
-    # If all the arguments have been provided, load the file with btk th#!/usr/bin/env python3en start the function
+    # If all the arguments have been provided, load the file with btk then start the function
 
     ######################################################
     # Load the file

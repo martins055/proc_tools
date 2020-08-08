@@ -5,7 +5,7 @@
 @author: Martin
 
 Description:
-    Create an anatomical marker based on the location of the a cluster of markers. in a motion file
+    Create an anatomical marker based on the location of the a cluster of markers in a motion file
     It requires a calibration file where all marker positions are known
     Example of use: to virtualize position of epicondyles from a humerus cluster
 
@@ -33,6 +33,10 @@ def create_anatomical_marker(acqCalibration,acqMotion,args):
     # Tidying up some variables
     calibrationFrame = args.calibrationFrame
     clusterMarkersNamesList = args.clusterMarkers.split(",") # create a list out of the clusterMarkerNames string
+    
+    print("\nCluster markers name list is {}".format(clusterMarkersNamesList))
+    print("Anatomical marker name is {}\n".format(args.anatMarkerName))
+
 
     def rigid_transform_3D(A, B):
     
@@ -83,25 +87,27 @@ def create_anatomical_marker(acqCalibration,acqMotion,args):
     # Get cluster markers
 
     # Create an object (point) for each marker
-    point1 = acqCalibration.GetPoint(clusterMarkersNamesList[0])
-    point2 = acqCalibration.GetPoint(clusterMarkersNamesList[1])
-    point3 = acqCalibration.GetPoint(clusterMarkersNamesList[2])
+    point1Calibration = acqCalibration.GetPoint(clusterMarkersNamesList[0])
+    point2Calibration = acqCalibration.GetPoint(clusterMarkersNamesList[1])
+    point3Calibration = acqCalibration.GetPoint(clusterMarkersNamesList[2])
 
-    point1x = point1.GetValues()[calibrationFrame,0]
-    point1y = point1.GetValues()[calibrationFrame,1]
-    point1z = point1.GetValues()[calibrationFrame,2]
-    point2x = point2.GetValues()[calibrationFrame,0]
-    point2y = point2.GetValues()[calibrationFrame,1]
-    point2z = point2.GetValues()[calibrationFrame,2]
-    point3x = point3.GetValues()[calibrationFrame,0]
-    point3y = point3.GetValues()[calibrationFrame,1]
-    point3z = point3.GetValues()[calibrationFrame,2]
+    point1xCalibration = point1Calibration.GetValues()[calibrationFrame,0]
+    point1yCalibration = point1Calibration.GetValues()[calibrationFrame,1]
+    point1zCalibration = point1Calibration.GetValues()[calibrationFrame,2]
+    point2xCalibration = point2Calibration.GetValues()[calibrationFrame,0]
+    point2yCalibration = point2Calibration.GetValues()[calibrationFrame,1]
+    point2zCalibration = point2Calibration.GetValues()[calibrationFrame,2]
+    point3xCalibration = point3Calibration.GetValues()[calibrationFrame,0]
+    point3yCalibration = point3Calibration.GetValues()[calibrationFrame,1]
+    point3zCalibration = point3Calibration.GetValues()[calibrationFrame,2]
 
     cluster1 = np.mat([
-                            [ point1x , point1y , point1z ],
-                            [ point2x , point2y , point2z ],
-                            [ point3x , point3y , point3z ]
+                            [ point1xCalibration , point1yCalibration , point1zCalibration ],
+                            [ point2xCalibration , point2yCalibration , point2zCalibration ],
+                            [ point3xCalibration , point3yCalibration , point3zCalibration ]
                             ])
+
+    print("Cluster 1 is:\n{}\n".format(cluster1))
 
     # Get anatomical marker
 
@@ -111,36 +117,50 @@ def create_anatomical_marker(acqCalibration,acqMotion,args):
     pointAnat1y = pointAnat1.GetValues()[calibrationFrame,1]
     pointAnat1z = pointAnat1.GetValues()[calibrationFrame,2]
 
+    print(pointAnat1x)
+
     ############################################################################################################################
     # Go through the motion file, calculate rotation and translation matrices and calculate new anatomical marker coordinates
     ############################################################################################################################
 
     ## create a 3 columns numpy array that will later become our new point in btk
-    number_steps = acqMotion.GetPointFrameNumber() # give the number of frames
+    #number_steps = acqMotion.GetPointFrameNumber() # give the number of frames
+    number_steps = acqMotion.GetLastFrame() - acqMotion.GetFirstFrame() +1 # number_steps = acq.GetPointFrameNumber() # give the number of frames
+    print(acqMotion.GetLastFrame())
+    print(acqMotion.GetFirstFrame())
+    print(number_steps)
+
+
     newpointStructure = (number_steps,3)
     newValue = np.ones(newpointStructure) # identity numpy array with 3 colum and PointFrameNumber rows.
     newValue[:] = np.nan # fill with NaNs to make any mistake obvious
 
+    # Create an object (point) for each marker
+    point1Motion = acqMotion.GetPoint(clusterMarkersNamesList[0])
+    point2Motion = acqMotion.GetPoint(clusterMarkersNamesList[1])
+    point3Motion = acqMotion.GetPoint(clusterMarkersNamesList[2])
+
     i=0
     for frame in range(0, number_steps ): # for each frame of the motion file
-
+        print("Motion file, doing frame {}".format(frame))
         # Get the cluster2 from the motion file at this specific frame
-
-        point1x = point1.GetValues()[frame,0]
-        point1y = point1.GetValues()[frame,1]
-        point1z = point1.GetValues()[frame,2]
-        point2x = point2.GetValues()[frame,0]
-        point2y = point2.GetValues()[frame,1]
-        point2z = point2.GetValues()[frame,2]
-        point3x = point3.GetValues()[frame,0]
-        point3y = point3.GetValues()[frame,1]
-        point3z = point3.GetValues()[frame,2]
+        point1xMotion = point1Motion.GetValues()[frame,0]
+        point1yMotion = point1Motion.GetValues()[frame,1]
+        point1zMotion = point1Motion.GetValues()[frame,2]
+        point2xMotion = point2Motion.GetValues()[frame,0]
+        point2yMotion = point2Motion.GetValues()[frame,1]
+        point2zMotion = point2Motion.GetValues()[frame,2]
+        point3xMotion = point3Motion.GetValues()[frame,0]
+        point3yMotion = point3Motion.GetValues()[frame,1]
+        point3zMotion = point3Motion.GetValues()[frame,2]
 
         cluster2 = np.mat([
-                                [ point1x , point1y , point1z ],
-                                [ point2x , point2y , point2z ],
-                                [ point3x , point3y , point3z ]
+                                [ point1xMotion , point1yMotion , point1zMotion ],
+                                [ point2xMotion , point2yMotion , point2zMotion ],
+                                [ point3xMotion , point3yMotion , point3zMotion ]
                                 ])
+
+        print("Cluster 2 is:\n{}\n".format(cluster2))
 
         # Calculate rotation and translation matrices between the two clusters (cluster from calibration file, and cluster from this motion frame)
         anat1 = np.mat([ pointAnat1x , pointAnat1y , pointAnat1z ])
@@ -205,9 +225,9 @@ if __name__ == '__main__':
         readerCalibration = btk.btkAcquisitionFileReader() # build a btk reader object
         readerCalibration.SetFilename(args.calibrationFile) # set a filename to the reader
         readerCalibration.Update()
+        acqCalibration = readerCalibration.GetOutput() # acq is the btk aquisition object
 
         print("Loading the motion file {}".format(args.motionFile))
-        acqCalibration = readerCalibration.GetOutput() # acq is the btk aquisition object
         readerMotion = btk.btkAcquisitionFileReader() # build a btk reader object
         readerMotion.SetFilename(args.motionFile) # set a filename to the reader
         readerMotion.Update()
