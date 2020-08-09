@@ -21,23 +21,26 @@ Ressources:
 
 def rename_markers(acq,args):
 
-	# Load the marker names
-	markerListFrom = args.makerListFrom.split(",") # create a list out of the string with ","
-	markerListTo = args.makerListTo.split(",")
+    # Load the marker names
+    markerListFrom = args.markerListFrom.split(",") # create a list out of the string with ","
+    markerListTo = args.markerListTo.split(",")
 
-	# Check that we have same number of labels
-	if (len(markerListFrom) != len(markerListTo)):
-		print("Markers From and markers To do not have the same size. Exitting.")
-		quit()
+    # Check that we have same number of labels
+    if (len(markerListFrom) != len(markerListTo)):
+        print("Markers From and markers To do not have the same size. Exitting.")
+        quit()
 
-	# Rename from one list to another
-	for x in range(len(markerListFrom)): 
-		print("[{}] Renaming: From {} to {}".format(x,markerListFrom[x],markerListTo[x]))
+    # Rename from one list to another
+    for x in range(len(markerListFrom)): 
+        print("[{}] Renaming: From {} to {}".format(x,markerListFrom[x],markerListTo[x]))
 
-		point = acq.GetPoint(markerListFrom[x])
-		point.SetLabel(markerListTo[x]) # set the new label
+        try:
+            point = acq.GetPoint(markerListFrom[x])
+            point.SetLabel(markerListTo[x]) # set the new label
+        except:
+            print("Error getting or renaming the marker {}".format(markerListFrom[x]))
 
-	return acq
+    return acq
 
 if __name__ == '__main__':
 
@@ -46,10 +49,10 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Rename markers', formatter_class=argparse.RawTextHelpFormatter)
 
-    parser.add_argument ('--inputFile',     '-i', metavar = 'inputFile',      type = str,  help = 'The input file to load (.c3d or .trc)',   required=True)
-    parser.add_argument ('--from', '-f',     metavar = 'markerListFrom', type = str,  help = 'List of names of the markers to rename',  required=True)
-    parser.add_argument ('--to',   '-t',     metavar = 'markerListTo',   type = str,  help = 'List of the new names of the markers',    required=True)
-    parser.add_argument ('--outputFile',    '-o',     metavar = 'outputFile',     type = str,  help = 'The output file to write (.c3d or .trc)', required=True)
+    parser.add_argument ('--inputFile',      '-i', metavar = 'inputFile',      type = str,  help = 'The input file to load (.c3d or .trc)',   required=True)
+    parser.add_argument ('--markerListFrom', '-f', metavar = 'markerListFrom', type = str,  help = 'List of names of the markers to rename',  required=True)
+    parser.add_argument ('--markerListTo',   '-t', metavar = 'markerListTo',   type = str,  help = 'List of the new names of the markers',    required=True)
+    parser.add_argument ('--outputFile',     '-o', metavar = 'outputFile',     type = str,  help = 'The output file to write (.c3d or .trc)', required=True)
 
     args = parser.parse_args()
 
@@ -73,8 +76,13 @@ if __name__ == '__main__':
     ######################################################
     # Rename the markers
     ######################################################
-    acq_modified = rename_markers(acq,args)
+    
+    #point = acq.GetPoint("AC_R")
+    #print(point)
+    #point.SetLabel(markerListTo[x]) # set the new label
 
+    acq_modified = rename_markers(acq,args)
+    
     ######################################################
     # Save the file
     ######################################################
