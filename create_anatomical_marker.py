@@ -11,6 +11,7 @@ Description:
 
 Usage:
     python3 create_anatomical_marker.py --calibrationFile "test.trc" --calibrationFrame 0 --clusterMarkers "HUM_CL-SupAnt","HUM_CL-SupPost","HUM_CL-InfAnt" --anatMarkerName "EPI_MED" --motionFile "test.trc" --newMarkerName "NewMarkerCustomName" --outputFile "myOutputFile.trc"
+    # can specify --onlyMissingFrames to keep existing frames if only some parts are missing and need reconstructing
     or import as module
 
 Requirements:
@@ -19,7 +20,7 @@ Requirements:
 
 To do:
     [] in the calibration file, calculate the average of the positions instead of just one frame
-    [] allow to define 4 or more markers instead of 3 for the cluster
+    [] allow to define 4 or more markers instead of 3 for the cluster (*args/**kwargs)
     [] optimize for real time processing
 
 """
@@ -117,8 +118,6 @@ def create_anatomical_marker(acqCalibration,acqMotion,args):
     pointAnat1y = pointAnat1.GetValues()[calibrationFrame,1]
     pointAnat1z = pointAnat1.GetValues()[calibrationFrame,2]
 
-    print(pointAnat1x)
-
     ############################################################################################################################
     # Go through the motion file, calculate rotation and translation matrices and calculate new anatomical marker coordinates
     ############################################################################################################################
@@ -126,10 +125,6 @@ def create_anatomical_marker(acqCalibration,acqMotion,args):
     ## create a 3 columns numpy array that will later become our new point in btk
     #number_steps = acqMotion.GetPointFrameNumber() # give the number of frames
     number_steps = acqMotion.GetLastFrame() - acqMotion.GetFirstFrame() +1 # number_steps = acq.GetPointFrameNumber() # give the number of frames
-    print(acqMotion.GetLastFrame())
-    print(acqMotion.GetFirstFrame())
-    print(number_steps)
-
 
     newpointStructure = (number_steps,3)
     newValue = np.ones(newpointStructure) # identity numpy array with 3 colum and PointFrameNumber rows.
@@ -139,10 +134,12 @@ def create_anatomical_marker(acqCalibration,acqMotion,args):
     point1Motion = acqMotion.GetPoint(clusterMarkersNamesList[0])
     point2Motion = acqMotion.GetPoint(clusterMarkersNamesList[1])
     point3Motion = acqMotion.GetPoint(clusterMarkersNamesList[2])
+    pointAnatMotion = acqMotion.GetPoint(args.anatMarkerName)
 
     i=0
     for frame in range(0, number_steps ): # for each frame of the motion file
         print("Motion file, doing frame {}".format(frame))
+
         # Get the cluster2 from the motion file at this specific frame
         point1xMotion = point1Motion.GetValues()[frame,0]
         point1yMotion = point1Motion.GetValues()[frame,1]
@@ -176,16 +173,58 @@ def create_anatomical_marker(acqCalibration,acqMotion,args):
         #print("frame {}, test anat recovered is: {}".format(i,test_anat))
         #print("x = {}, y = {}, z={}".format(test_anat[0],test_anat[1],test_anat[2]))
 
+        ## If we only asked to reconstruct only the missing frames (--onlyMissingFrames),
+        ## check if all xyz values exist. If yes copy them, if no reconstruct
+
+        # did we ask to reconstruct only the missing frames?
+        print("did we specify missing frames only?")
+        # print(args.onlyMissingFrames)
+        copyInsteadOfReconstructing = False
+        if (args.onlyMissingFrames == True):
+            print("YES")
+            print("Do we have xyz values for the anatomical marker ({}) at this frame of the motion file?".format(args.anatMarkerName))
+            anatxMotion = pointAnatMotion.GetValues()[frame,0]
+            anatyMotion = pointAnatMotion.GetValues()[frame,1]
+            anatzMotion = pointAnatMotion.GetValues()[frame,2]
+            if ( anatxMotion and anatyMotion and anatzMotion != "0.0"):
+                print("YES: need to copy, do not reconstruct")
+                print("{} ; {} ; {}".format(anatxMotion,anatyMotion,anatzMotion))
+                copyInsteadOfReconstructing = True
+            else:
+                print("NO (at least one missing value) reconstruct, do not copy")
+                print("{} ; {} ; {}".format(anatxMotion,anatyMotion,anatzMotion))
+            # yes: copy them and skip the cluster part
+            # no: reconstruct them            
+
+        if (args.onlyMissingFrames == False):
+            print("NO")
+            print("We asked to reconstruct all the frames regardless of if some already exist. Do nothing")
+            # just go ahead then
+        #input()
+
         # Add the values to a numpy array, we will append it to the aquisition once we have all the values (after this loop)
-        newValue[i,0] = test_anat[0] # X value at this step
-        newValue[i,1] = test_anat[1] # Y value at this step
-        newValue[i,2] = test_anat[2] # Z value at this step
+        if (copyInsteadOfReconstructing == True):
+            print("we are copying the values from the original file because the values already exist")
+            print("{} ; {} ; {}\n".format(anatxMotion,anatyMotion,anatzMotion))
+            newValue[i,0] = anatxMotion # X value at this step
+            newValue[i,1] = anatyMotion # Y value at this step
+            newValue[i,2] = anatzMotion # Z value at this step
+        elif (copyInsteadOfReconstructing == False):
+            print("we are generating the values from the original file because the values do NOT already exist")
+            print("{} ; {} ; {}\n".format(test_anat[0],test_anat[1],test_anat[2]))
+            newValue[i,0] = test_anat[0] # X value at this step
+            newValue[i,1] = test_anat[1] # Y value at this step
+            newValue[i,2] = test_anat[2] # Z value at this step
 
         i+=1
 
     ######################################################
     # Add the array as a new point
     ######################################################
+
+    print("\n\nDEBUG\n\n")
+    np.set_printoptions(threshold=sys.maxsize)
+    print(np.array_str(newValue, precision=5, suppress_small=False))
 
     newpoint = btk.btkPoint(number_steps) # create an empty new point object
     newpoint.SetLabel(args.newMarkerName) # set newPoint as label
@@ -203,13 +242,14 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Create anatmical marker', formatter_class=argparse.RawTextHelpFormatter)
 
-    parser.add_argument ('--calibrationFile',  '-cfile',    metavar = 'calibrationFile',  type = str,  help = 'The calibration file to load (.c3d or .trc)',   required=True)
-    parser.add_argument ('--calibrationFrame', '-cframe',   metavar = 'calibrationFrame', type = int,  help = 'The frame of the calibration file to consider', required=True)
-    parser.add_argument ('--clusterMarkers',   '-cmarkers', metavar = 'clusterMarkers',   type = str,  help = 'List of names of the 3 cluster markers',        required=True)
-    parser.add_argument ('--anatMarkerName',   '-amarker',  metavar = 'anatMarkerName',   type = str,  help = 'The name of anatomical marker to consider',     required=True)
-    parser.add_argument ('--motionFile',       '-mfile',    metavar = 'motionFile',       type = str,  help = 'The motion file to load',                       required=True)
-    parser.add_argument ('--newMarkerName',    '-nmarker',  metavar = 'newMarkerName',    type = str,  help = 'The name of new marker that will be created',   required=True)
-    parser.add_argument ('--outputFile',       '-o',        metavar = 'outputFile',       type = str,  help = 'The output file to write (.c3d or .trc)',       required=True)
+    parser.add_argument ('--calibrationFile',   '-cfile',    metavar = 'calibrationFile',   type = str,  help = 'The calibration file to load (.c3d or .trc)',   required=True)
+    parser.add_argument ('--calibrationFrame',  '-cframe',   metavar = 'calibrationFrame',  type = int,  help = 'The frame of the calibration file to consider', required=True)
+    parser.add_argument ('--clusterMarkers',    '-cmarkers', metavar = 'clusterMarkers',    type = str,  help = 'List of names of the 3 cluster markers',        required=True)
+    parser.add_argument ('--anatMarkerName',    '-amarker',  metavar = 'anatMarkerName',    type = str,  help = 'The name of anatomical marker to consider',     required=True)
+    parser.add_argument ('--motionFile',        '-mfile',    metavar = 'motionFile',        type = str,  help = 'The motion file to load',                       required=True)
+    parser.add_argument ('--newMarkerName',     '-nmarker',  metavar = 'newMarkerName',     type = str,  help = 'The name of new marker that will be created',   required=True)
+    parser.add_argument ('--outputFile',        '-o',        metavar = 'outputFile',        type = str,  help = 'The output file to write (.c3d or .trc)',       required=True)
+    parser.add_argument ('--onlyMissingFrames', '-mframes',                                              help = 'Reconstruct on missing frames only',            required=False, action='store_true', default=False)
 
     args = parser.parse_args()
 
@@ -220,6 +260,7 @@ if __name__ == '__main__':
     ######################################################
     import sys
     import btk
+
     try:
         print("Loading the calibration file {}".format(args.calibrationFile))
         readerCalibration = btk.btkAcquisitionFileReader() # build a btk reader object
